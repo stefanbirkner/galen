@@ -16,11 +16,8 @@
 package com.galenframework.junit;
 
 import org.junit.Test;
-import org.junit.runners.Parameterized.*;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.firefox.FirefoxDriver;
-
-import static java.util.Arrays.asList;
 
 import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -42,12 +39,4 @@ public class GalenJUnitTestBaseIT extends GalenJUnitTestBase {
         assertThat(getTestName(), is(equalTo(
                 "com.galenframework.junit.GalenJUnitTestBaseIT#>shouldConcatenateClassAndMethodNameForTestName")));
     }
-
-    @Parameters
-    public static Iterable<String> devices() {
-        return asList("dummy device");
-    }
-
-    @Parameter
-    public Object device;
 }

@@ -16,14 +16,14 @@
 package com.galenframework.junit;
 
 import org.junit.runner.notification.RunNotifier;
-import org.junit.runners.Parameterized;
+import org.junit.runners.BlockJUnit4ClassRunner;
 
 /**
  * Galen JUnit test runner
  *
  * @author mreinhardt
  */
-public class GalenReportTestRunner extends Parameterized {
+public class GalenReportTestRunner extends BlockJUnit4ClassRunner {
 
     private RunNotifier notifier;
 
