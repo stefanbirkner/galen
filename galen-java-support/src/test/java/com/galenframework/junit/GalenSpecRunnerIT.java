@@ -1,9 +1,5 @@
 package com.galenframework.junit;
 
-import com.sun.net.httpserver.Headers;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import org.hamcrest.Matcher;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -15,32 +11,42 @@ import org.junit.runner.Result;
 import org.junit.runner.RunWith;
 import org.junit.runner.notification.Failure;
 
+import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
+import java.nio.file.Paths;
 
-import static java.util.concurrent.Executors.newCachedThreadPool;
-import static org.apache.commons.io.IOUtils.write;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.nio.file.Files.delete;
+import static java.nio.file.Files.write;
+import static java.util.Arrays.asList;
 import static org.hamcrest.Matchers.*;
+import static org.junit.Assume.assumeTrue;
 
 public class GalenSpecRunnerIT {
-    private static final int NO_DELAY = 0;
-    private static final int PORT = 13728;
-    private static final int SYSTEM_DEFAULT_BACKLOG = 0;
-    private static HttpServer SERVER;
+    private static final String HTML_FILE = "/tmp/GalsenSpecRunnerIT.html";
 
     @BeforeClass
-    public static void startServer() throws IOException {
-        InetSocketAddress address = new InetSocketAddress(PORT);
-        SERVER = HttpServer.create(address, SYSTEM_DEFAULT_BACKLOG);
-        SERVER.createContext("/", new SingleFileHandler());
-        SERVER.setExecutor(newCachedThreadPool());
-        SERVER.start();
+    public static void createHtmlFile() throws IOException {
+        if (existsTmpFolder()) {
+            write(Paths.get(HTML_FILE),
+                    asList("<!DOCTYPE html>",
+                            "<html>",
+                            "<head>",
+                            "</head>",
+                            "<body>",
+                            "<p id=\"p1\" style=\"width:400px;float:left;\">First paragraph.</p>",
+                            "<p id=\"p2\">Second paragraph.</p>",
+                            "</body>",
+                            "</html>"),
+                    UTF_8);
+        }
     }
 
     @AfterClass
-    public static void stopServer() {
-        SERVER.stop(NO_DELAY);
+    public static void deleteHtmlFile() throws IOException {
+        if (existsTmpFolder()) {
+            delete(Paths.get(HTML_FILE));
+        }
     }
 
     @Rule
@@ -49,12 +55,13 @@ public class GalenSpecRunnerIT {
     @RunWith(GalenSpecRunner.class)
     @Size(width = 640, height = 480)
     @Spec("/com/galenframework/junit/homepage_small.gspec")
-    @Url("http://127.0.0.1:" + PORT + "/")
+    @Url("file://" + HTML_FILE)
     public static class ValidSpec {
     }
 
     @Test
     public void shouldBeSuccessfulForValidSpec() {
+        assumeTrue(existsTmpFolder());
         Result result = runTest(ValidSpec.class);
         //We use an error collector because running a test for each assertion takes too much time.
         collector.checkThat("is successful", result.wasSuccessful(), is(true));
@@ -65,12 +72,13 @@ public class GalenSpecRunnerIT {
     @RunWith(GalenSpecRunner.class)
     @Size(width = 640, height = 480)
     @Spec("/com/galenframework/junit/inapplicable.gspec")
-    @Url("http://127.0.0.1:" + PORT + "/")
+    @Url("file://" + HTML_FILE)
     public static class InapplicableSpec {
     }
 
     @Test
     public void shouldFailForInapplicableSpec() {
+        assumeTrue(existsTmpFolder());
         Result result = runTest(InapplicableSpec.class);
         //We use an error collector because running a test for each assertion takes too much time.
         collector.checkThat("is not successful", result.wasSuccessful(), is(false));
@@ -87,12 +95,13 @@ public class GalenSpecRunnerIT {
     @Include("variantA")
     @Size(width = 640, height = 480)
     @Spec("/com/galenframework/junit/tag.gspec")
-    @Url("http://127.0.0.1:" + PORT + "/")
+    @Url("file://" + HTML_FILE)
     public static class ExcludeTag {
     }
 
     @Test
     public void shouldNotRunTestsForSectionsThatAreExcluded() {
+        assumeTrue(existsTmpFolder());
         Result result = runTest(ExcludeTag.class);
         collector.checkThat("has only tests for not excluded sections", result.getRunCount(), is(3));
     }
@@ -102,19 +111,20 @@ public class GalenSpecRunnerIT {
     @Exclude("variantB")
     @Size(width = 640, height = 480)
     @Spec("/com/galenframework/junit/tag.gspec")
-    @Url("http://127.0.0.1:" + PORT + "/")
+    @Url("file://" + HTML_FILE)
     public static class IncludeTag {
     }
 
     @Test
     public void shouldOnlyRunTestsForSectionsThatAreIncluded() {
+        assumeTrue(existsTmpFolder());
         Result result = runTest(IncludeTag.class);
         collector.checkThat("has only tests for included sections", result.getRunCount(), is(2));
     }
 
     @RunWith(GalenSpecRunner.class)
     @Spec("/com/galenframework/junit/homepage_small.gspec")
-    @Url("http://127.0.0.1:" + PORT + "/")
+    @Url("file://" + HTML_FILE)
     public static class NoSizeAnnotation {
     }
 
@@ -131,7 +141,7 @@ public class GalenSpecRunnerIT {
 
     @RunWith(GalenSpecRunner.class)
     @Size(width = 640, height = 480)
-    @Url("http://127.0.0.1:" + PORT + "/")
+    @Url("file://" + HTML_FILE)
     public static class NoSpecAnnotation {
     }
 
@@ -171,25 +181,8 @@ public class GalenSpecRunnerIT {
         return JUnitCore.runClasses(test);
     }
 
-    private static class SingleFileHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange httpExchange) throws IOException {
-            Headers responseHeaders = httpExchange.getResponseHeaders();
-            responseHeaders.set("Content-Type", "text/html");
-            httpExchange.sendResponseHeaders(200, 0);
-            String bodyAsText =
-                    "<!DOCTYPE html>\n" +
-                            "<html>\n" +
-                            "<head>\n" +
-                            "</head>\n" +
-                            "<body>\n" +
-                            "<p id=\"p1\" style=\"width:400px;float:left;\">First paragraph.</p>\n" +
-                            "<p id=\"p2\">Second paragraph.</p>\n" +
-                            "</body>\n" +
-                            "</html>";
-            OutputStream responseBody = httpExchange.getResponseBody();
-            write(bodyAsText, responseBody);
-            responseBody.close();
-        }
+    private static boolean existsTmpFolder() {
+        File tmpFolder = new File("/tmp");
+        return tmpFolder.exists();
     }
 }
